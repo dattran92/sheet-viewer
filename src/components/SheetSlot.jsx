@@ -15,6 +15,7 @@ export default function SheetSlot({
   lineWeight,
   color,
   drawMode,
+  tool,
 }) {
   const fileInputRef = useRef(null);
   const [displayURL, setDisplayURL] = useState(null);
@@ -124,6 +125,7 @@ export default function SheetSlot({
         lineWeight={lineWeight}
         color={color}
         drawMode={drawMode}
+        tool={tool}
       />
 
       {cropOpen && (

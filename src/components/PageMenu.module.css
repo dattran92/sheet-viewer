@@ -71,6 +71,39 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  transition: opacity 0.1s;
+}
+
+.dragging {
+  opacity: 0.35;
+}
+
+.dropAbove {
+  border-top: 2px solid var(--accent);
+}
+
+.dropBelow {
+  border-bottom: 2px solid var(--accent);
+}
+
+.grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 36px;
+  color: var(--text-muted);
+  cursor: grab;
+  touch-action: none;
+}
+
+.grip:active {
+  cursor: grabbing;
+}
+
+.gripIcon {
+  pointer-events: none;
 }
 
 .pageItem {

@@ -1,10 +1,30 @@
 import { useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 import styles from './DrawingCanvas.module.css';
 
-const LINE_WEIGHTS = { thin: 2, medium: 4, thick: 8 };
+const LINE_WEIGHTS = { thin: 2, medium: 4, thick: 8, xl: 24 };
 
-// Draw all strokes onto ctx at the given canvas dimensions.
-// Points are normalized (0–1); image strokes are scaled to fill.
+function applyStroke(ctx, stroke, w, h) {
+  if (!stroke.points || stroke.points.length < 1) return;
+  ctx.save();
+  if (stroke.tool === 'eraser') {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.strokeStyle = 'rgba(0,0,0,1)';
+  } else {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = stroke.color;
+  }
+  ctx.lineWidth = stroke.weight;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(stroke.points[0].x * w, stroke.points[0].y * h);
+  for (let i = 1; i < stroke.points.length; i++) {
+    ctx.lineTo(stroke.points[i].x * w, stroke.points[i].y * h);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 function renderStrokes(ctx, strokes, w, h) {
   ctx.clearRect(0, 0, w, h);
   strokes.forEach((stroke) => {
@@ -14,24 +34,12 @@ function renderStrokes(ctx, strokes, w, h) {
       img.src = stroke.dataURL;
       return;
     }
-    if (!stroke.points || stroke.points.length < 1) return;
-    ctx.save();
-    ctx.strokeStyle = stroke.color;
-    ctx.lineWidth = stroke.weight;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(stroke.points[0].x * w, stroke.points[0].y * h);
-    for (let i = 1; i < stroke.points.length; i++) {
-      ctx.lineTo(stroke.points[i].x * w, stroke.points[i].y * h);
-    }
-    ctx.stroke();
-    ctx.restore();
+    applyStroke(ctx, stroke, w, h);
   });
 }
 
 const DrawingCanvas = forwardRef(function DrawingCanvas(
-  { drawing, onSave, lineWeight, color, drawMode },
+  { drawing, onSave, lineWeight, color, drawMode, tool },
   ref
 ) {
   const canvasRef = useRef(null);
@@ -45,7 +53,6 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(
     renderStrokes(canvas.getContext('2d'), strokes, canvas.width, canvas.height);
   }, []);
 
-  // Load saved drawing when prop changes
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -64,11 +71,9 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(
     }
   }, [drawing]);
 
-  // Sync canvas resolution to its CSS size; redraw from strokes on resize
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const syncSize = () => {
       const { width, height } = canvas.getBoundingClientRect();
       const w = Math.round(width);
@@ -78,14 +83,12 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(
       canvas.height = h;
       redraw(strokesRef.current);
     };
-
     syncSize();
     const observer = new ResizeObserver(syncSize);
     observer.observe(canvas);
     return () => observer.disconnect();
   }, [redraw]);
 
-  // Normalized position relative to canvas
   function getPos(e) {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
@@ -100,11 +103,11 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(
     e.preventDefault();
     canvasRef.current.setPointerCapture(e.pointerId);
     isDrawingRef.current = true;
-    const pos = getPos(e);
     currentStrokeRef.current = {
+      tool: tool || 'pen',
       color,
       weight: LINE_WEIGHTS[lineWeight] ?? 4,
-      points: [pos],
+      points: [getPos(e)],
     };
   }
 
@@ -115,15 +118,20 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(
     const stroke = currentStrokeRef.current;
     stroke.points.push(pos);
 
-    // Incremental draw — scale normalized coords to canvas pixels
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
     const pts = stroke.points;
     if (pts.length >= 2) {
       const p1 = pts[pts.length - 2];
       const p2 = pts[pts.length - 1];
+      const ctx = canvas.getContext('2d');
       ctx.save();
-      ctx.strokeStyle = stroke.color;
+      if (stroke.tool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.strokeStyle = 'rgba(0,0,0,1)';
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = stroke.color;
+      }
       ctx.lineWidth = stroke.weight;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -166,7 +174,7 @@ const DrawingCanvas = forwardRef(function DrawingCanvas(
   return (
     <canvas
       ref={canvasRef}
-      className={styles.canvas}
+      className={`${styles.canvas} ${tool === 'eraser' && drawMode ? styles.eraser : ''}`}
       style={{ pointerEvents: drawMode ? 'auto' : 'none' }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

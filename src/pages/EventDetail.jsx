@@ -18,6 +18,7 @@ const WEIGHTS = [
   { value: 'thin', label: 'Thin', px: 2 },
   { value: 'medium', label: 'Medium', px: 4 },
   { value: 'thick', label: 'Thick', px: 8 },
+  { value: 'xl', label: 'X-Large', px: 14 },
 ];
 
 export default function EventDetail() {
@@ -26,7 +27,7 @@ export default function EventDetail() {
 
   const [event, setEvent] = useState(null);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  const [drawMode, setDrawMode] = useState(false);
+  const [activeTool, setActiveTool] = useState(null); // null | 'pen' | 'eraser'
   const [lineWeight, setLineWeight] = useState('medium');
   const [color, setColor] = useState('#000000');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -133,6 +134,24 @@ export default function EventDetail() {
     persistEvent({ ...event, pages: updatedPages });
   }
 
+  function handleReorderPages(fromIdx, toIdx) {
+    const reordered = [...event.pages];
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+    // Keep current page tracking the same page after reorder
+    let newIndex = currentPageIndex;
+    if (currentPageIndex === fromIdx) {
+      newIndex = toIdx;
+    } else if (fromIdx < toIdx && currentPageIndex > fromIdx && currentPageIndex <= toIdx) {
+      newIndex = currentPageIndex - 1;
+    } else if (fromIdx > toIdx && currentPageIndex >= toIdx && currentPageIndex < fromIdx) {
+      newIndex = currentPageIndex + 1;
+    }
+    drawingRefs.current = [];
+    persistEvent({ ...event, pages: reordered });
+    setCurrentPageIndex(newIndex);
+  }
+
   function handleDeletePage() {
     const idx = pendingDeletePageIndex;
     const page = event.pages[idx];
@@ -217,7 +236,8 @@ export default function EventDetail() {
                   drawingRef={(el) => (drawingRefs.current[idx] = el)}
                   lineWeight={lineWeight}
                   color={color}
-                  drawMode={drawMode}
+                  drawMode={activeTool !== null}
+                  tool={activeTool || 'pen'}
                 />
               );
             })}
@@ -229,14 +249,26 @@ export default function EventDetail() {
       {totalPages > 0 && (
         <div className={styles.toolbar}>
           <button
-            className={`${styles.toolBtn} ${drawMode ? styles.toolBtnActive : ''}`}
-            onClick={() => setDrawMode((v) => !v)}
-            title={drawMode ? 'Disable drawing' : 'Enable drawing'}
-            aria-pressed={drawMode}
+            className={`${styles.toolBtn} ${activeTool === 'pen' ? styles.toolBtnActive : ''}`}
+            onClick={() => setActiveTool((t) => t === 'pen' ? null : 'pen')}
+            title="Pen"
+            aria-pressed={activeTool === 'pen'}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 20h9"/>
               <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+            </svg>
+          </button>
+
+          <button
+            className={`${styles.toolBtn} ${activeTool === 'eraser' ? styles.toolBtnActive : ''}`}
+            onClick={() => setActiveTool((t) => t === 'eraser' ? null : 'eraser')}
+            title="Eraser"
+            aria-pressed={activeTool === 'eraser'}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 20H7L3 16l10-10 7 7-1.5 1.5"/>
+              <path d="M6.5 17.5l5-5"/>
             </svg>
           </button>
 
@@ -248,7 +280,7 @@ export default function EventDetail() {
               className={`${styles.weightBtn} ${lineWeight === w.value ? styles.toolBtnActive : ''}`}
               onClick={() => setLineWeight(w.value)}
               title={w.label}
-              disabled={!drawMode}
+              disabled={activeTool === null}
             >
               <span
                 className={styles.weightDot}
@@ -265,7 +297,7 @@ export default function EventDetail() {
               className={`${styles.colorBtn} ${color === c.value ? styles.colorBtnActive : ''}`}
               onClick={() => setColor(c.value)}
               title={c.label}
-              disabled={!drawMode}
+              disabled={activeTool !== 'pen'}
               style={{ '--swatch': c.value }}
             />
           ))}
@@ -275,7 +307,7 @@ export default function EventDetail() {
           <button
             className={styles.toolBtn}
             onClick={handleUndo}
-            disabled={!drawMode}
+            disabled={activeTool === null}
             title="Undo last stroke"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -287,7 +319,7 @@ export default function EventDetail() {
           <button
             className={styles.toolBtn}
             onClick={() => setShowClearModal(true)}
-            disabled={!drawMode}
+            disabled={activeTool === null}
             title="Clear drawings"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -380,9 +412,8 @@ export default function EventDetail() {
             drawingRefs.current = [];
             setCurrentPageIndex(idx);
           }}
-          onDelete={(idx) => {
-            setPendingDeletePageIndex(idx);
-          }}
+          onDelete={(idx) => setPendingDeletePageIndex(idx)}
+          onReorder={handleReorderPages}
           onClose={() => setMenuOpen(false)}
         />
       )}

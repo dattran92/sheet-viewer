@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { loadData, saveData, createPage } from '../storage.js';
-import { deleteSheetImages } from '../imageStore.js';
+import { loadData, saveData, createPage, generateId } from '../storage.js';
+import { saveImageFile, deleteSheetImages } from '../imageStore.js';
 import SheetSlot from '../components/SheetSlot.jsx';
 import PageMenu from '../components/PageMenu.jsx';
 import Modal from '../components/Modal.jsx';
+import ImportModal from '../components/ImportModal.jsx';
 import modalStyles from '../components/Modal.module.css';
 import styles from './EventDetail.module.css';
 
@@ -38,6 +39,8 @@ export default function EventDetail() {
   const [newPageName, setNewPageName] = useState('');
   const [showClearModal, setShowClearModal] = useState(false);
   const [pendingDeletePageIndex, setPendingDeletePageIndex] = useState(null);
+  const [importFiles, setImportFiles] = useState(null);
+  const importInputRef = useRef(null);
 
   // Refs for DrawingCanvas instances (one per slot on current page)
   const drawingRefs = useRef([]);
@@ -132,6 +135,23 @@ export default function EventDetail() {
       i === currentPageIndex ? { ...p, name: trimmed } : p
     );
     persistEvent({ ...event, pages: updatedPages });
+  }
+
+  async function handleImportConfirm(items) {
+    const newPages = [];
+    for (const { file, name } of items) {
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      const filename = generateId() + '.' + ext;
+      await saveImageFile(filename, file);
+      const page = createPage(1, name);
+      page.sheets[0].imageFile = filename;
+      page.sheets[0].originalImageFile = filename;
+      newPages.push(page);
+    }
+    const updatedEvent = { ...event, pages: [...event.pages, ...newPages] };
+    persistEvent(updatedEvent);
+    setCurrentPageIndex(event.pages.length);
+    setImportFiles(null);
   }
 
   function handleReorderPages(fromIdx, toIdx) {
@@ -401,6 +421,31 @@ export default function EventDetail() {
         >
           + Page
         </button>
+
+        <button
+          className={styles.importBtn}
+          onClick={() => importInputRef.current?.click()}
+          aria-label="Import images"
+          title="Import images as pages"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </button>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const files = Array.from(e.target.files || []);
+            e.target.value = '';
+            if (files.length) setImportFiles(files);
+          }}
+        />
       </div>
 
       {/* Page Menu */}
@@ -472,6 +517,15 @@ export default function EventDetail() {
             Delete <strong>"{pages[pendingDeletePageIndex]?.name || `Page ${pendingDeletePageIndex + 1}`}"</strong>? This cannot be undone.
           </p>
         </Modal>
+      )}
+
+      {/* Import Modal */}
+      {importFiles && (
+        <ImportModal
+          files={importFiles}
+          onConfirm={handleImportConfirm}
+          onClose={() => setImportFiles(null)}
+        />
       )}
 
       {/* Clear Drawings Confirm Modal */}

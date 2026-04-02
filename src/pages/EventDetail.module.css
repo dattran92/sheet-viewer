@@ -302,3 +302,22 @@
 .addPageBtn:hover {
   background: var(--accent-hover);
 }
+
+.importBtn {
+  background: var(--surface2);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.importBtn:hover {
+  background: var(--accent);
+  color: #fff;
+}

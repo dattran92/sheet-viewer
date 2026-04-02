@@ -1,7 +1,8 @@
 const CACHE_NAME = 'sheet-viewer-v1';
+const BASE = self.location.pathname.replace(/sw\.js$/, '');
 const APP_SHELL = [
-  '/',
-  '/index.html',
+  BASE,
+  BASE + 'index.html',
 ];
 
 self.addEventListener('install', (event) => {
@@ -27,10 +28,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
   if (event.request.method !== 'GET') return;
-
-  // Skip chrome-extension and non-http requests
   if (!event.request.url.startsWith('http')) return;
 
   event.respondWith(
@@ -39,7 +37,6 @@ self.addEventListener('fetch', (event) => {
 
       return fetch(event.request)
         .then((response) => {
-          // Cache successful responses for same-origin requests
           if (
             response.ok &&
             response.type === 'basic' &&
@@ -53,9 +50,8 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          // If fetch fails and it's a navigation, return the cached index
           if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
+            return caches.match(BASE + 'index.html');
           }
         });
     })

@@ -1,0 +1,14 @@
+.cropArea {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  max-height: 65vh;
+  overflow: hidden;
+}
+
+.cropImg {
+  max-width: 100%;
+  max-height: 65vh;
+  display: block;
+  object-fit: contain;
+}

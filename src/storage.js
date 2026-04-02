@@ -44,7 +44,8 @@ export function createPage(layout, name) {
   const count = Number(layout);
   const sheets = Array.from({ length: count }, () => ({
     id: generateId(),
-    imageData: null,
+    imageFile: null,
+    originalImageFile: null,
   }));
   return {
     id: generateId(),

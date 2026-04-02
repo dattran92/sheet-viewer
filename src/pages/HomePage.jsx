@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { loadData, saveData, createEvent } from '../storage.js';
+import { deleteSheetImages } from '../imageStore.js';
 import Modal from '../components/Modal.jsx';
 import modalStyles from '../components/Modal.module.css';
 import styles from './HomePage.module.css';
@@ -44,6 +45,12 @@ export default function HomePage() {
 
   function handleDelete() {
     const data = loadData();
+    const deletedEvent = data.events.find((ev) => ev.id === pendingDeleteId);
+    if (deletedEvent) {
+      deletedEvent.pages.forEach((page) =>
+        page.sheets.forEach((sheet) => deleteSheetImages(sheet))
+      );
+    }
     const updated = { ...data, events: data.events.filter((ev) => ev.id !== pendingDeleteId) };
     saveData(updated);
     setEvents(updated.events);

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { loadData, saveData, createPage } from '../storage.js';
+import { deleteSheetImages } from '../imageStore.js';
 import SheetSlot from '../components/SheetSlot.jsx';
 import PageMenu from '../components/PageMenu.jsx';
 import Modal from '../components/Modal.jsx';
@@ -79,10 +80,29 @@ export default function EventDetail() {
     setShowNewPageModal(false);
   }
 
-  function handleImageLoad(slotIndex, base64) {
+  function handleImageLoad(slotIndex, imageFile) {
     const page = event.pages[currentPageIndex];
+    const oldSheet = page.sheets[slotIndex];
+    // Delete old files from OPFS (fire-and-forget)
+    deleteSheetImages(oldSheet);
     const updatedSheets = page.sheets.map((s, i) =>
-      i === slotIndex ? { ...s, imageData: base64 } : s
+      i === slotIndex ? { ...s, imageFile, originalImageFile: imageFile } : s
+    );
+    const updatedPages = event.pages.map((p, i) =>
+      i === currentPageIndex ? { ...p, sheets: updatedSheets } : p
+    );
+    persistEvent({ ...event, pages: updatedPages });
+  }
+
+  function handleCropApply(slotIndex, imageFile) {
+    const page = event.pages[currentPageIndex];
+    const oldSheet = page.sheets[slotIndex];
+    // Delete old cropped file if it differs from the original
+    if (oldSheet.imageFile && oldSheet.imageFile !== oldSheet.originalImageFile) {
+      deleteSheetImages({ imageFile: oldSheet.imageFile, originalImageFile: null });
+    }
+    const updatedSheets = page.sheets.map((s, i) =>
+      i === slotIndex ? { ...s, imageFile } : s
     );
     const updatedPages = event.pages.map((p, i) =>
       i === currentPageIndex ? { ...p, sheets: updatedSheets } : p
@@ -115,6 +135,9 @@ export default function EventDetail() {
 
   function handleDeletePage() {
     const idx = pendingDeletePageIndex;
+    const page = event.pages[idx];
+    // Clean up OPFS images for all sheets on this page
+    page.sheets.forEach((sheet) => deleteSheetImages(sheet));
     const updatedPages = event.pages.filter((_, i) => i !== idx);
     const newIndex = Math.min(currentPageIndex, Math.max(0, updatedPages.length - 1));
     drawingRefs.current = [];
@@ -187,7 +210,8 @@ export default function EventDetail() {
                 <SheetSlot
                   key={sheet.id}
                   sheet={sheet}
-                  onImageLoad={(base64) => handleImageLoad(idx, base64)}
+                  onImageLoad={(imageFile) => handleImageLoad(idx, imageFile)}
+                  onCropApply={(imageFile) => handleCropApply(idx, imageFile)}
                   drawing={currentPage.drawings?.[idx] ?? null}
                   onDrawingSave={(dataURL) => handleDrawingSave(idx, dataURL)}
                   drawingRef={(el) => (drawingRefs.current[idx] = el)}
